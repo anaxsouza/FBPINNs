@@ -13,7 +13,7 @@ Created on Wed Mar 27 18:40:57 2019
 import pickle
 
 import sys
-sys.path.insert(0, '../shared_modules/')
+sys.path.insert(0, '/home/anaxsouza/Documents/GitKraken/FBPINNs/shared_modules/')
 import io_utils
 
 

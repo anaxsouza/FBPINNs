@@ -21,9 +21,9 @@ import boundary_conditions
 import losses
 
 import sys
-sys.path.insert(0, '../analytical_solutions/')
+sys.path.insert(0, '/home/anaxsouza/Documents/GitKraken/FBPINNs/analytical_solutions/')
 from burgers_solution import burgers_viscous_time_exact1
-sys.path.insert(0, '../seismic-cpml')
+sys.path.insert(0, '/home/anaxsouza/Documents/GitKraken/FBPINNs/seismic-cpml')
 from seismic_CPML_2D_pressure_second_order import seismicCPML2D
 
 
