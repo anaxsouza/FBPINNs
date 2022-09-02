@@ -28,6 +28,20 @@ def tanh_1(x, mu, sd):
     
     return t, jt
 
+def tanh_2(x, mu, sd):
+    "Compute solution/gradients of y=tanh((x-mu)/sd)"
+    
+    xn = (x-mu)/sd
+    
+    tanh = torch.tanh(xn)
+    sech2 = (1-tanh**2)
+    
+    t   = tanh
+    jt  = (1/sd)    * sech2
+    jjt  = (1/sd**2)    * -2*tanh*sech2
+    
+    return t, jt, jjt
+
 def tanh2_2(x, mu, sd):
     "Compute solution/gradients of y=tanh^2((x-mu)/sd)"
     
@@ -71,6 +85,34 @@ def sigmoid_2(x, mu, sd):
     jjs = (1/sd**2) * sig*(1-sig)*(1-2*sig)
     
     return s, js, jjs
+
+def sin(x, w, mu, sd):
+    "Compute solution/gradients of y=sin((x-mu)/sd)"
+    
+    xn = (w*x-mu)/sd
+    
+    sin = torch.sin(xn)
+    cos = torch.cos(xn)
+    
+    s   = sin
+    js  = (w/sd)    * cos
+    jjs  = (w**2/sd**2)    * -sin
+
+    return s, js, jjs
+
+def cos(x, mu, sd):
+    "Compute solution/gradients of y=cos((x-mu)/sd)"
+    
+    xn = (w*x-mu)/sd
+    
+    sin = torch.sin(xn)
+    cos = torch.cos(xn)
+    
+    c   = cos
+    jc  = (w/sd)    * -sin
+    jjc  = (w**2/sd**2)    * -cos
+
+    return c, jc, jjc
 
 # helper analytical functions (fused)
 

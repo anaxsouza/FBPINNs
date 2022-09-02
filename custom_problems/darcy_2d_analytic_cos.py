@@ -79,11 +79,11 @@ class Darcy_2D(problems._Problem):
         bc_jj0 = -(np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
         bc_jj1 = -(np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
         
-        y_new = t0*t1*y #+ k*(bc_y)
-        j0_new = jt0*t1*y + t0*t1*j0 #+ k*(bc_j0)
-        j1_new = jt1*t0*y + t0*t1*j1 #+ k*(bc_j1)
-        jj0_new = jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0 #+ k*(bc_jj0)
-        jj1_new = jjt1*t1*y + 2*jt0*t1*j1 + t0*t1*jj1 #+ k*(bc_jj1)
+        y_new = t0*t1*y 
+        j0_new = jt0*t1*y + t0*t1*j0  
+        j1_new = jt1*t0*y + t1*t0*j1 
+        jj0_new = jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0
+        jj1_new = jjt1*t0*y + 2*jt1*t0*j1 + t1*t0*jj1   
 
         return y_new, j0_new, j1_new, jj0_new, jj1_new
 

@@ -65,11 +65,11 @@ class Darcy_2D(problems._Problem):
         t0, jt0, jjt0 = boundary_conditions.tanh2_2(x[:,0:1], 0, sd)
         t1, jt1, jjt1 = boundary_conditions.tanh2_2(x[:,1:2], 0, sd)
 
-        y_new = t0*t1*y #+ bc_y
-        j0_new = jt0*t1*y + t0*t1*j0 #+ bc_j0
-        j1_new = jt1*t0*y + t0*t1*j1 #+ bc_j1
-        jj0_new = jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0 #+ bc_jj0
-        jj1_new = jjt1*t1*y + 2*jt0*t1*j1 + t0*t1*jj1 #+ bc_jj1
+        y_new = t0*t1*y 
+        j0_new = jt0*t1*y + t0*t1*j0  
+        j1_new = jt1*t0*y + t1*t0*j1 
+        jj0_new = jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0
+        jj1_new = jjt1*t0*y + 2*jt1*t0*j1 + t1*t0*jj1   
 
         return y_new, j0_new, jj0_new, j1_new, jj1_new
 

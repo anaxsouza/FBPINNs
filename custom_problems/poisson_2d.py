@@ -23,33 +23,35 @@ class poisson_2D(problems._Problem):
 
     #    Solves the 2D PDE:
     #    d^2u   d^2u
-    #    ---- + ---- = -2*sin(x)*sin(y)
+    #    ---- + ---- = -2*w^2*sin(wx)*sin(wy)
     #    dx^2   dy^2
     #    
     #    Boundary conditions:
     #    u(0,y) = 0
     #    u(x,0) = 0
-    #    u(1,y) = sin(1)*sin(y)
-    #    u(x,1) = sin(x)*sin(1)
+    #    u(1,y) = sin(wy)
+    #    u(x,1) = sin(wx)
     #
-    #    Exact Solution: sin(x)sin(y)
+    #    Exact Solution: sin(wx)sin(wy)
     
     
     @property
     def name(self):
-        return "poisson_2D_%s"%(self)
+        return "Poisson_2D_w%s"%(self.w)
     
-    def __init__(self, run):
+    def __init__(self, run, w):
 
         # dimensionality of x and y
 
         self.run = run
 
         self.d = (2,1)
+
+        self.w = w
     
     def physics_loss(self, x, y, j0, j1, jj0, jj1):
         
-        physics = (jj0[:,0] + jj1[:,0]) + (2*torch.sin(x[:,0])*torch.sin(x[:,1]))
+        physics = (jj0[:,0] + jj1[:,0]) + ((2*self.w**2)*torch.sin(self.w*x[:,0])*torch.sin(self.w*x[:,1]))
         
         return losses.l2_loss(physics, 0)
 
@@ -67,40 +69,34 @@ class poisson_2D(problems._Problem):
         
         # Apply u = tanh(x)tanh(x - u(x))*tanh(y)tanh(x - u(y))NN ansatz
         
-        #t0, jt0, jjt0 = boundary_conditions.cos(x[:,0:1], 1, np.pi/2, sd)
-        #t1, jt1, jjt1 = boundary_conditions.cos(x[:,1:2], 1, np.pi/2, sd)
-        
-        t0 = torch.sin(x[:,0:1])
-        jt0 = torch.cos(x[:,0:1])
-        jjt0 = -torch.sin(x[:,0:1])
+        t0, jt0, jjt0 = boundary_conditions.sin(x[:,0:1], 1, 0, sd)
+        t1, jt1, jjt1 = boundary_conditions.sin(x[:,1:2], 1, 0, sd)
 
-        t1 = torch.sin(x[:,1:2])
-        jt1 = torch.cos(x[:,1:2])
-        jjt1 = -torch.sin(x[:,1:2])
-  
         y_new = t0*t1*y 
         j0_new = jt0*t1*y + t0*t1*j0  
-        j1_new = jt1*t0*y + t0*t1*j1 
-        jj0_new = jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0  
-        jj1_new = jjt1*t1*y + 2*jt0*t1*j1 + t0*t1*jj1 
+        j1_new = jt1*t0*y + t1*t0*j1 
+        jj0_new = jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0
+        jj1_new = jjt1*t0*y + 2*jt1*t0*j1 + t1*t0*jj1   
 
         return y_new, j0_new, j1_new, jj0_new, jj1_new
 
     def exact_solution(self, x, batch_size):
         
-        y = torch.sin(x[:,0:1])*torch.sin(x[:,1:2])
+        y = torch.sin(self.w*x[:,0:1])*torch.sin(self.w*x[:,1:2])
         
-        j0 = torch.cos(x[:,0:1])*torch.sin(x[:,1:2])
-        j1 = torch.sin(x[:,0:1])*torch.cos(x[:,1:2])
+        j0 = self.w*torch.cos(self.w*x[:,0:1])*torch.sin(self.w*x[:,1:2])
+        j1 = self.w*torch.sin(self.w*x[:,0:1])*torch.cos(self.w*x[:,1:2])
         
-        jj0 = -torch.sin(x[:,0:1])*torch.sin(x[:,1:2])
-        jj1 = -torch.sin(x[:,0:1])*torch.sin(x[:,1:2])
+        jj0 = -(self.w**2)*torch.sin(self.w*x[:,0:1])*torch.sin(self.w*x[:,1:2])
+        jj1 = -(self.w**2)*torch.sin(self.w*x[:,0:1])*torch.sin(self.w*x[:,1:2])
 
         return y, j0, j1, jj0, jj1
 
-run = 'Poisson_1'
+run = 'Poisson_2'
 
-P = poisson_2D(run)
+w = 1
+
+P = poisson_2D(run, w)
 
 #hyper-parameters
 
@@ -109,11 +105,11 @@ width = .8
 subdomain_xs = [np.arange(0, 2.1*np.pi, np.pi), np.arange(0, 2.1*np.pi, np.pi)]
 subdomain_ws = constants.get_subdomain_ws(subdomain_xs, width)
 
-subdomain_xs_2 = [np.arange(0, 12.1*np.pi, 4*np.pi), np.arange(0, 12.1*np.pi, 4*np.pi)]
+subdomain_xs_2 = [np.arange(0, 13*np.pi, 4*np.pi), np.arange(0, 13*np.pi, 4*np.pi)]
 subdomain_ws_2 = constants.get_subdomain_ws(subdomain_xs_2, width)
 
-boundary_n = (1,)
-y_n = (0, 1)
+boundary_n = (P.w ,)
+y_n = (0, 1/P.w)
 batch_size = (50,50)
 batch_size_test = (100,100)
 
@@ -125,7 +121,7 @@ n_hidden_2, n_layers_2 = 32, 4
 lrate = 1e-4
 
 summary_freq    = 250
-test_freq       = 250
+test_freq       = 250  
 model_save_freq = 50000
 
 seed = 123
@@ -263,4 +259,4 @@ plt.xlabel("Training step")
 plt.ylabel("L2 loss")
 plt.legend()
 plt.title("Loss Comparison")
-plt.savefig('loss_comparison_poisson_1_l2')
+plt.savefig('loss_comparison_poisson_l2')
