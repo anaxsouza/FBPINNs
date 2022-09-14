@@ -1,5 +1,5 @@
 """
-Created on Tue Apr  12 14:28:00 2022
+Created on Tue May 02 14:28:00 2022
 
 @author: anaxsouza
 """
@@ -7,7 +7,6 @@ Created on Tue Apr  12 14:28:00 2022
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-
 import sys
 sys.path.insert(0, '../fbpinns/')
 sys.dont_write_bytecode = True
@@ -18,113 +17,138 @@ import constants
 import active_schedulers
 import main
 import models
+import perm_functions as pf
 
-class poisson_2D(problems._Problem):
+class Darcy_2D(problems._Problem):
 
     #    Solves the 2D PDE:
-    #    d^2u   d^2u
-    #    ---- + ---- = -2*w^2*sin(wx)*sin(wy)
-    #    dx^2   dy^2
-    #    
-    #    Boundary conditions:
-    #    u(0,y) = 0
-    #    u(x,0) = 0
-    #    u(1,y) = sin(wy)
-    #    u(x,1) = sin(wx)
+    #     d²u    d²u          
+    #    ---- + ---- = k*(-8*pi^2*sin(2pi*x)sin(2pi*y))
+    #     dx²    dy²     
     #
-    #    Exact Solution: sin(wx)sin(wy)
-    
+    #   k = f(x,y)
+    #
+    # Exact Solution: sin(2pix)sin(2piy)
+    #
+    # BC:
+    # u(x,0) = 0
+    # u(0,y) = 0
     
     @property
     def name(self):
-        return "Poisson_2D_w%s"%(self.w)
+        return "Darcy_2D_Masud_%s"%(self)
     
-    def __init__(self, run, w):
-
+    def __init__(self, run):
+        
         # dimensionality of x and y
 
         self.run = run
 
         self.d = (2,1)
 
-        self.w = w
-    
     def physics_loss(self, x, y, j0, j1, jj0, jj1):
+
+        kx = 1
+        ky = 1
         
-        physics = (jj0[:,0] + jj1[:,0]) + ((2*self.w**2)*torch.sin(self.w*x[:,0])*torch.sin(self.w*x[:,1]))
+        k = kx*ky #permeability
+
+        physics = (jj0[:,0] + jj1[:,0]) + (k*(8*np.pi**2)*(torch.sin(2*np.pi*x[:,0])*torch.sin(2*np.pi*x[:,1])))
         
         return losses.l2_loss(physics, 0)
 
     def get_gradients(self, x, y):
         
-        j =  torch.autograd.grad(y, x, torch.ones_like(y), create_graph=True)[0]
-        j0, j1 = j[:,0:1], j[:,1:2]
-        
-        jj = torch.autograd.grad(j, x, torch.ones_like(j), create_graph=True)[0]
-        jj0, jj1 = jj[:,0:1], jj[:,1:2]
+        j0 = torch.autograd.grad(y, x, torch.ones_like(y), create_graph=True)[0][:,0:1]
+        j1 = torch.autograd.grad(y, x, torch.ones_like(y), create_graph=True)[0][:,1:2]
+
+        jj0 = torch.autograd.grad(j0, x, torch.ones_like(j0), create_graph=True)[0][:,0:1]
+        jj1 = torch.autograd.grad(j1, x, torch.ones_like(j1), create_graph=True)[0][:,1:2]
 
         return y, j0, j1, jj0, jj1
 
     def boundary_condition(self, x, y, j0, j1, jj0, jj1, sd):
-        
-        # Apply u = tanh(x)tanh(x - u(x))*tanh(y)tanh(x - u(y))NN ansatz
-        
-        t0, jt0, jjt0 = boundary_conditions.tanhtanh_2(x[:,0:1], 0, 4*np.pi, sd)
-        t1, jt1, jjt1 = boundary_conditions.sin(x[:,1:2], w, 0, sd)
 
-        y_new = t0*t1*y 
-        j0_new = jt0*t1*y + t0*t1*j0  
-        j1_new = jt1*t0*y + t1*t0*j1
-        jj0_new = jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0
-        jj1_new = jjt1*t0*y + 2*jt1*t0*j1 + t1*t0*jj1   
+        kx = 1
+        ky = 1        
+        
+        k = kx*ky #permeability
+
+        # Apply u = tanh(x)tanh(x - u(x))*tanh(y)tanh(x - u(y))NN +cos(x)*cos(y) ansatz
+        
+        t0, jt0, jjt0 = boundary_conditions.tanhtanh_2(x[:,0:1], 0, 1, sd)
+        t1, jt1, jjt1 = boundary_conditions.tanhtanh_2(x[:,1:2], 0, 1, sd)
+        '''
+        bc_y   = torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
+        bc_j0  = -np.pi*torch.sin(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
+        bc_j1  = -np.pi*torch.cos(np.pi*x[:,0:1])*torch.sin(np.pi*x[:,1:2])
+        bc_jj0 = -(np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
+        bc_jj1 = -(np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
+        '''
+        y_new = k*(t0*t1*y)
+        j0_new = k*(jt0*t1*y + t0*t1*j0) 
+        j1_new = k*(jt1*t0*y + t1*t0*j1)
+        jj0_new = k*(jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0)
+        jj1_new = k*(jjt1*t0*y + 2*jt1*t0*j1 + t1*t0*jj1)  
 
         return y_new, j0_new, j1_new, jj0_new, jj1_new
 
     def exact_solution(self, x, batch_size):
         
-        y = torch.sin(self.w*x[:,0:1])*torch.sin(self.w*x[:,1:2])
+        kx = 1
+        ky = 1       
         
-        j0 = self.w*torch.cos(self.w*x[:,0:1])*torch.sin(self.w*x[:,1:2])
-        j1 = self.w*torch.sin(self.w*x[:,0:1])*torch.cos(self.w*x[:,1:2])
+        k = kx*ky #permeability
+
+        y = k*(torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
         
-        jj0 = -(self.w**2)*torch.sin(self.w*x[:,0:1])*torch.sin(self.w*x[:,1:2])
-        jj1 = -(self.w**2)*torch.sin(self.w*x[:,0:1])*torch.sin(self.w*x[:,1:2])
+        j0 = k*((2*np.pi)*torch.cos(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
+        j1 = k*((2*np.pi)*torch.sin(2*np.pi*x[:,0:1])*torch.cos(2*np.pi*x[:,1:2]))
+        
+        jj0 = k*((-4*np.pi**2)*torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
+        jj1 = k*((-4*np.pi**2)*torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
+
 
         return y, j0, j1, jj0, jj1
 
-run = 'Poisson_2D'
+#domain definition
 
-w = 10
+x_domain_start = 0
+y_domain_start = 0
 
-P = poisson_2D(run, w)
+x_domain_end = 1.1
+y_domain_end = 1.1
+
+step = .5
+
+run = 'Darcy_Flow'
+
+P = Darcy_2D(run)
 
 #hyper-parameters
 
 width = .8
 
-subdomain_xs = [np.arange(0, 4.1*np.pi, np.pi), np.arange(0, 4.1*np.pi, np.pi)]
+subdomain_xs = [np.arange(x_domain_start, x_domain_end, step), np.arange(y_domain_start, y_domain_end, step)]
 subdomain_ws = constants.get_subdomain_ws(subdomain_xs, width)
 
-subdomain_xs_2 = [np.arange(0, 4.1*np.pi, 2*np.pi), np.arange(0, 4.1*np.pi, 2*np.pi)]
-subdomain_ws_2 = constants.get_subdomain_ws(subdomain_xs_2, width)
-
 boundary_n = (1,)
-y_n = (0, 1)
-batch_size = (200,200)
-batch_size_test = (400,400)
+y_n = (0,1)
+batch_size = (50,50)
+batch_size_test = (100,100)
 
-n_steps = 100000
+n_steps = 50000
 n_hidden, n_layers = 16, 2
 
-n_hidden_2, n_layers_2 = 128, 16
+n_hidden_2, n_layers_2 = 32, 4
 
 lrate = 1e-4
 
 summary_freq    = 250
-test_freq       = 5000
-model_save_freq = 10000
+test_freq       = 2500
+model_save_freq = 50000
 
-seed = 123
+seed = 697093
 
 #define NN
 
@@ -213,19 +237,20 @@ run.train()
 run = main.PINNTrainer(c3)
 run.train()
 
+
 # finally, compare runs by plotting saved test losses
 
-#fbpinn_loss = np.load("results/models/%s/loss_%.8i.npy"%(c1.RUN, n_steps))
+fbpinn_loss = np.load("results/models/%s/loss_%.8i.npy"%(c1.RUN, n_steps))
 pinn_loss   = np.load("results/models/%s/loss_%.8i.npy"%(c2.RUN, n_steps))
-#pinn_ff_loss   = np.load("results/models/%s/loss_%.8i.npy"%(c3.RUN, n_steps))
+pinn_ff_loss   = np.load("results/models/%s/loss_%.8i.npy"%(c3.RUN, n_steps))
 
-plt.figure(figsize=(12,10))
-#plt.plot(fbpinn_loss[:,0], fbpinn_loss[:,3], label=c1.RUN)
+plt.figure(figsize=(7,5))
+plt.plot(fbpinn_loss[:,0], fbpinn_loss[:,3], label=c1.RUN)
 plt.plot(pinn_loss[:,0], pinn_loss[:,3], label=c2.RUN)
-#plt.plot(pinn_ff_loss[:,0], pinn_ff_loss[:,3], label=c3.RUN)
+plt.plot(pinn_ff_loss[:,0], pinn_ff_loss[:,3], label=c3.RUN)
 plt.yscale("log")
 plt.xlabel("Training step")
 plt.ylabel("L2 loss")
 plt.legend()
 plt.title("Loss Comparison")
-plt.savefig('loss_comparison_poisson_l2')
+plt.savefig('loss_comparison_darcy_l2')

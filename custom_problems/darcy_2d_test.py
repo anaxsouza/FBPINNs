@@ -17,7 +17,6 @@ import constants
 import active_schedulers
 import main
 import models
-import perm_functions as pf
 
 class Darcy_2D(problems._Problem):
 
@@ -48,12 +47,7 @@ class Darcy_2D(problems._Problem):
 
     def physics_loss(self, x, y, j0, j1, jj0, jj1):
 
-        kx = pf.sin(x[:,0], 1, 0)
-        ky = pf.sin(x[:,1], 1, 0)        
-        
-        k = kx*ky #permeability
-
-        physics = (jj0[:,0] + jj1[:,0]) + (k*(2*np.pi**2)*(torch.cos(np.pi*x[:,0])*torch.cos(np.pi*x[:,1])))
+        physics = (jj0[:,0] + jj1[:,0]) + (2*np.pi**2)*(torch.cos(np.pi*x[:,0])*torch.cos(np.pi*x[:,1]))
         
         return losses.l2_loss(physics, 0)
 
@@ -69,44 +63,28 @@ class Darcy_2D(problems._Problem):
 
     def boundary_condition(self, x, y, j0, j1, jj0, jj1, sd):
 
-        kx = pf.sin(x[:,0:1], 1, 0)
-        ky = pf.sin(x[:,1:2], 1, 0)        
-        
-        k = kx*ky #permeability
-
         # Apply u = tanh(x)tanh(x - u(x))*tanh(y)tanh(x - u(y))NN +cos(x)*cos(y) ansatz
         
-        t0, jt0, jjt0 = boundary_conditions.sin(x[:,0:1], np.pi, 0, sd)
-        t1, jt1, jjt1 = boundary_conditions.sin(x[:,1:2], np.pi, 0, sd)
+        t0, jt0, jjt0 = boundary_conditions.cos(x[:,0:1], np.pi, 0, sd)
+        t1, jt1, jjt1 = boundary_conditions.cos(x[:,1:2], np.pi, 0, sd)
         
-        bc_y   = torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
-        bc_j0  = -np.pi*torch.sin(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
-        bc_j1  = -np.pi*torch.cos(np.pi*x[:,0:1])*torch.sin(np.pi*x[:,1:2])
-        bc_jj0 = -(np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
-        bc_jj1 = -(np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
-        
-        y_new = k*(t0*t1*y + bc_y)
-        j0_new = k*(jt0*t1*y + t0*t1*j0 + bc_j0) 
-        j1_new = k*(jt1*t0*y + t1*t0*j1 + bc_j1)
-        jj0_new = k*(jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0 + bc_jj0)
-        jj1_new = k*(jjt1*t0*y + 2*jt1*t0*j1 + t1*t0*jj1 + bc_jj1)  
+        y_new = t0*t1*y 
+        j0_new = jt0*t1*y + t0*t1*j0
+        j1_new = jt1*t0*y + t1*t0*j1
+        jj0_new = jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0
+        jj1_new = jjt1*t0*y + 2*jt1*t0*j1 + t1*t0*jj1
 
         return y_new, j0_new, j1_new, jj0_new, jj1_new
 
     def exact_solution(self, x, batch_size):
-        
-        kx = pf.sin(x[:,0:1], 1, 0)
-        ky = pf.sin(x[:,1:2], 1, 0)        
-        
-        k = kx*ky #permeability
 
-        y = k*(torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2]))
+        y = torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
         
-        j0 = k*((-np.pi)*torch.sin(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2]))
-        j1 = k*((-np.pi)*torch.cos(np.pi*x[:,0:1])*torch.sin(np.pi*x[:,1:2]))
+        j0 = (-np.pi)*torch.sin(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
+        j1 = (-np.pi)*torch.cos(np.pi*x[:,0:1])*torch.sin(np.pi*x[:,1:2])
         
-        jj0 = k*((-np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2]))
-        jj1 = k*((-np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2]))
+        jj0 = (-np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
+        jj1 = (-np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
 
 
         return y, j0, j1, jj0, jj1
@@ -178,76 +156,17 @@ c1 = constants.Constants(
             CLEAR_OUTPUT=True,
             )
 
-c2 = constants.Constants(
-            RUN="PINN_%s"%(P.run),
-            P=P,
-            SUBDOMAIN_XS=subdomain_xs,
-            BOUNDARY_N=boundary_n,
-            Y_N=y_n,
-            SEED=seed,
-            N_HIDDEN=n_hidden_2,
-            N_LAYERS=n_layers_2,
-            BATCH_SIZE=batch_size,
-            LRATE = lrate,
-            N_STEPS=n_steps,
-            BATCH_SIZE_TEST=batch_size_test,
-            SUMMARY_FREQ    = summary_freq,
-            TEST_FREQ       = test_freq,
-            MODEL_SAVE_FREQ = model_save_freq,
-            MODEL = models.FCN,
-            PLOT_LIMS=(2, False),
-            SHOW_FIGURES = False,
-            SAVE_FIGURES = True,
-            CLEAR_OUTPUT=True,
-            )
 
-c3 = constants.Constants(
-            RUN="PINN_FF_%s"%(P.run),
-            P=P,
-            SUBDOMAIN_XS=subdomain_xs,
-            BOUNDARY_N=boundary_n,
-            Y_N=y_n,
-            SEED=seed,
-            N_HIDDEN=n_hidden_2,
-            N_LAYERS=n_layers_2,
-            BATCH_SIZE=batch_size,
-            LRATE = lrate,
-            N_STEPS=n_steps,
-            BATCH_SIZE_TEST=batch_size_test,
-            SUMMARY_FREQ    = summary_freq,
-            TEST_FREQ       = test_freq,
-            MODEL_SAVE_FREQ = model_save_freq,
-            MODEL = models.FCN_FF,
-            PLOT_LIMS=(2, False),
-            SHOW_FIGURES = False,
-            SAVE_FIGURES = True,
-            CLEAR_OUTPUT=True,
-            )
-
-'''
 # train FBPINN_FCN
-run = main.FBPINNTrainer(c1)
+run = main.FBPINNTrainer_Perm(c1)
 run.train()
-'''
-# train PINN_FCN
-run = main.PINNTrainer(c2)
-run.train()
-
-# train PINN_FCN_FF
-run = main.PINNTrainer(c3)
-run.train()
-
 
 # finally, compare runs by plotting saved test losses
 
 fbpinn_loss = np.load("results/models/%s/loss_%.8i.npy"%(c1.RUN, n_steps))
-pinn_loss   = np.load("results/models/%s/loss_%.8i.npy"%(c2.RUN, n_steps))
-pinn_ff_loss   = np.load("results/models/%s/loss_%.8i.npy"%(c3.RUN, n_steps))
 
 plt.figure(figsize=(7,5))
 plt.plot(fbpinn_loss[:,0], fbpinn_loss[:,3], label=c1.RUN)
-plt.plot(pinn_loss[:,0], pinn_loss[:,3], label=c2.RUN)
-plt.plot(pinn_ff_loss[:,0], pinn_ff_loss[:,3], label=c3.RUN)
 plt.yscale("log")
 plt.xlabel("Training step")
 plt.ylabel("L2 loss")

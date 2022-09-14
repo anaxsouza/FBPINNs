@@ -100,7 +100,7 @@ def sin(x, w, mu, sd):
 
     return s, js, jjs
 
-def cos(x, mu, sd):
+def cos(x, w, mu, sd):
     "Compute solution/gradients of y=cos((x-mu)/sd)"
     
     xn = (w*x-mu)/sd
