@@ -158,7 +158,7 @@ c1 = constants.Constants(
 
 
 # train FBPINN_FCN
-run = main.FBPINNTrainer_Perm(c1)
+run = main.FBPINNTrainer_Perm(c=c1, k=[.1, .1, .1, .1])
 run.train()
 
 # finally, compare runs by plotting saved test losses
