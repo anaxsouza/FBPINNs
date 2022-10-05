@@ -17,7 +17,7 @@ import constants
 import active_schedulers
 import main
 import models
-import perm_functions as pf
+from scipy import signal
 
 class Darcy_2D(problems._Problem):
 
@@ -48,11 +48,6 @@ class Darcy_2D(problems._Problem):
 
     def physics_loss(self, x, y, j0, j1, jj0, jj1):
 
-        kx = 1
-        ky = 1
-        
-        k = kx*ky #permeability
-
         physics = (jj0[:,0] + jj1[:,0]) + (k*(8*np.pi**2)*(torch.sin(2*np.pi*x[:,0])*torch.sin(2*np.pi*x[:,1])))
         
         return losses.l2_loss(physics, 0)
@@ -69,22 +64,11 @@ class Darcy_2D(problems._Problem):
 
     def boundary_condition(self, x, y, j0, j1, jj0, jj1, sd):
 
-        kx = 1
-        ky = 1        
-        
-        k = kx*ky #permeability
-
         # Apply u = tanh(x)tanh(x - u(x))*tanh(y)tanh(x - u(y))NN +cos(x)*cos(y) ansatz
         
         t0, jt0, jjt0 = boundary_conditions.tanhtanh_2(x[:,0:1], 0, 1, sd)
         t1, jt1, jjt1 = boundary_conditions.tanhtanh_2(x[:,1:2], 0, 1, sd)
-        '''
-        bc_y   = torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
-        bc_j0  = -np.pi*torch.sin(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
-        bc_j1  = -np.pi*torch.cos(np.pi*x[:,0:1])*torch.sin(np.pi*x[:,1:2])
-        bc_jj0 = -(np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
-        bc_jj1 = -(np.pi**2)*torch.cos(np.pi*x[:,0:1])*torch.cos(np.pi*x[:,1:2])
-        '''
+
         y_new = k*(t0*t1*y)
         j0_new = k*(jt0*t1*y + t0*t1*j0) 
         j1_new = k*(jt1*t0*y + t1*t0*j1)
@@ -94,11 +78,6 @@ class Darcy_2D(problems._Problem):
         return y_new, j0_new, j1_new, jj0_new, jj1_new
 
     def exact_solution(self, x, batch_size):
-        
-        kx = 1
-        ky = 1       
-        
-        k = kx*ky #permeability
 
         y = k*(torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
         
@@ -223,12 +202,12 @@ c3 = constants.Constants(
             SAVE_FIGURES = True,
             CLEAR_OUTPUT=True,
             )
-
+'''
 
 # train FBPINN_FCN
 run = main.FBPINNTrainer(c1)
 run.train()
-
+'''
 # train PINN_FCN
 run = main.PINNTrainer(c2)
 run.train()

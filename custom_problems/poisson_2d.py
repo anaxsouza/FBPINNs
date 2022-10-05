@@ -215,14 +215,14 @@ run.train()
 
 # finally, compare runs by plotting saved test losses
 
-#fbpinn_loss = np.load("results/models/%s/loss_%.8i.npy"%(c1.RUN, n_steps))
+fbpinn_loss = np.load("results/models/%s/loss_%.8i.npy"%(c1.RUN, n_steps))
 pinn_loss   = np.load("results/models/%s/loss_%.8i.npy"%(c2.RUN, n_steps))
-#pinn_ff_loss   = np.load("results/models/%s/loss_%.8i.npy"%(c3.RUN, n_steps))
+pinn_ff_loss   = np.load("results/models/%s/loss_%.8i.npy"%(c3.RUN, n_steps))
 
 plt.figure(figsize=(12,10))
-#plt.plot(fbpinn_loss[:,0], fbpinn_loss[:,3], label=c1.RUN)
+plt.plot(fbpinn_loss[:,0], fbpinn_loss[:,3], label=c1.RUN)
 plt.plot(pinn_loss[:,0], pinn_loss[:,3], label=c2.RUN)
-#plt.plot(pinn_ff_loss[:,0], pinn_ff_loss[:,3], label=c3.RUN)
+plt.plot(pinn_ff_loss[:,0], pinn_ff_loss[:,3], label=c3.RUN)
 plt.yscale("log")
 plt.xlabel("Training step")
 plt.ylabel("L2 loss")
