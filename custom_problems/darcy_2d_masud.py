@@ -19,6 +19,20 @@ import main
 import models
 from scipy import signal
 
+def perm_fn(x_):
+    x = x_[:, 0]
+    y = x_[:, 1]
+    # left bottom
+    if x < 0.5 and y < 0.5:
+        return 0.01 * torch.ones_like(x)
+    # right bot
+    elif x >= 0.5 and y < 0.5:
+        return torch.ones_like(x)
+    elif x < 0.5 and y >= 0.5:
+        return torch.ones_like(x)
+    else:
+        return 0.01 * torch.ones_like(x)
+
 class Darcy_2D(problems._Problem):
 
     #    Solves the 2D PDE:
@@ -48,7 +62,7 @@ class Darcy_2D(problems._Problem):
 
     def physics_loss(self, x, y, j0, j1, jj0, jj1):
 
-        physics = (jj0[:,0] + jj1[:,0]) + (k*(8*np.pi**2)*(torch.sin(2*np.pi*x[:,0])*torch.sin(2*np.pi*x[:,1])))
+        physics = (jj0[:,0] + jj1[:,0]) + (perm_fn(x)*(8*np.pi**2)*(torch.sin(2*np.pi*x[:,0])*torch.sin(2*np.pi*x[:,1])))
         
         return losses.l2_loss(physics, 0)
 
