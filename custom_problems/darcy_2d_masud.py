@@ -19,19 +19,13 @@ import main
 import models
 from scipy import signal
 
-def perm_fn(x_):
-    x = x_[:, 0]
-    y = x_[:, 1]
-    # left bottom
-    if x < 0.5 and y < 0.5:
-        return 0.01 * torch.ones_like(x)
-    # right bot
-    elif x >= 0.5 and y < 0.5:
-        return torch.ones_like(x)
-    elif x < 0.5 and y >= 0.5:
-        return torch.ones_like(x)
-    else:
-        return 0.01 * torch.ones_like(x)
+def perm_fn(x1, x2, sc=20):
+    x = x1
+    y = x2
+    f = -torch.tanh(-sc * (0.5 - x)) * torch.tanh(-sc * (0.5 - y))
+    f = 0.5 * (1.0 + f) + 0.5 * (1.0 - f) * 0.01
+    
+    return f
 
 class Darcy_2D(problems._Problem):
 
@@ -42,7 +36,7 @@ class Darcy_2D(problems._Problem):
     #
     #   k = f(x,y)
     #
-    # Exact Solution: sin(2pix)sin(2piy)
+    # Exact Solution: 2sin(2pix)sin(2piy)
     #
     # BC:
     # u(x,0) = 0
@@ -62,7 +56,7 @@ class Darcy_2D(problems._Problem):
 
     def physics_loss(self, x, y, j0, j1, jj0, jj1):
 
-        physics = (jj0[:,0] + jj1[:,0]) + (perm_fn(x)*(8*np.pi**2)*(torch.sin(2*np.pi*x[:,0])*torch.sin(2*np.pi*x[:,1])))
+        physics = (jj0[:,0] + jj1[:,0]) + (perm_fn(x[:,0], x[:,1], sc=2000)*(8*np.pi**2)*(torch.sin(2*np.pi*x[:,0])*torch.sin(2*np.pi*x[:,1])))
         
         return losses.l2_loss(physics, 0)
 
@@ -81,25 +75,25 @@ class Darcy_2D(problems._Problem):
         # Apply u = tanh(x)tanh(x - u(x))*tanh(y)tanh(x - u(y))NN +cos(x)*cos(y) ansatz
         
         t0, jt0, jjt0 = boundary_conditions.tanhtanh_2(x[:,0:1], 0, 1, sd)
-        t1, jt1, jjt1 = boundary_conditions.tanhtanh_2(x[:,1:2], 0, 1, sd)
+        t1, jt1, jjt1 = boundary_conditions.sin(x[:,1:2], 2*np.pi, 0, sd)
 
-        y_new = k*(t0*t1*y)
-        j0_new = k*(jt0*t1*y + t0*t1*j0) 
-        j1_new = k*(jt1*t0*y + t1*t0*j1)
-        jj0_new = k*(jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0)
-        jj1_new = k*(jjt1*t0*y + 2*jt1*t0*j1 + t1*t0*jj1)  
-
+        y_new = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*(t0*t1*y)
+        j0_new = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*(jt0*t1*y + t0*t1*j0) 
+        j1_new = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*(jt1*t0*y + t1*t0*j1)
+        jj0_new = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*(jjt0*t1*y + 2*jt0*t1*j0 + t0*t1*jj0)
+        jj1_new = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*(jjt1*t0*y + 2*jt1*t0*j1 + t1*t0*jj1)  
+    
         return y_new, j0_new, j1_new, jj0_new, jj1_new
 
     def exact_solution(self, x, batch_size):
 
-        y = k*(torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
+        y = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*(torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
         
-        j0 = k*((2*np.pi)*torch.cos(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
-        j1 = k*((2*np.pi)*torch.sin(2*np.pi*x[:,0:1])*torch.cos(2*np.pi*x[:,1:2]))
+        j0 = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*((2*np.pi)*torch.cos(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
+        j1 = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*((2*np.pi)*torch.sin(2*np.pi*x[:,0:1])*torch.cos(2*np.pi*x[:,1:2]))
         
-        jj0 = k*((-4*np.pi**2)*torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
-        jj1 = k*((-4*np.pi**2)*torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
+        jj0 = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*((-4*np.pi**2)*torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
+        jj1 = perm_fn(x[:,0:1], x[:,1:2], sc=2000)*((-4*np.pi**2)*torch.sin(2*np.pi*x[:,0:1])*torch.sin(2*np.pi*x[:,1:2]))
 
 
         return y, j0, j1, jj0, jj1
@@ -127,8 +121,8 @@ subdomain_ws = constants.get_subdomain_ws(subdomain_xs, width)
 
 boundary_n = (1,)
 y_n = (0,1)
-batch_size = (50,50)
-batch_size_test = (100,100)
+batch_size = (20,20)
+batch_size_test = (50,50)
 
 n_steps = 50000
 n_hidden, n_layers = 16, 2
@@ -138,7 +132,7 @@ n_hidden_2, n_layers_2 = 32, 4
 lrate = 1e-4
 
 summary_freq    = 250
-test_freq       = 2500
+test_freq       = 250
 model_save_freq = 50000
 
 seed = 697093
@@ -216,12 +210,12 @@ c3 = constants.Constants(
             SAVE_FIGURES = True,
             CLEAR_OUTPUT=True,
             )
-'''
+
 
 # train FBPINN_FCN
 run = main.FBPINNTrainer(c1)
 run.train()
-'''
+
 # train PINN_FCN
 run = main.PINNTrainer(c2)
 run.train()
