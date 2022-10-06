@@ -22,7 +22,7 @@ from scipy import signal
 def perm_fn(x1, x2, sc=20):
     x = x1
     y = x2
-    f = -torch.tanh(-sc * (0.5 - x)) * torch.tanh(-sc * (0.5 - y))
+    f = torch.tanh(-sc * (0.5 - x)) * torch.tanh(-sc * (0.5 - y))
     f = 0.5 * (1.0 + f) + 0.5 * (1.0 - f) * 0.01
     
     return f
